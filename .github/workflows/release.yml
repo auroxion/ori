@@ -49,7 +49,7 @@ jobs:
           echo "raw_tag=$RAW_VER" >> "$GITHUB_OUTPUT"
           echo "Resolved release version: $CLEAN_VER (tag: $RAW_VER)"
 
-  build:
+  build-linux:
     needs: determine-version
     strategy:
       fail-fast: false
@@ -58,15 +58,19 @@ jobs:
           - runner: ubuntu-24.04
             arch: x86_64
             docker_image: ""
+            platform: linux
           - runner: ubuntu-24.04-arm
             arch: aarch64
             docker_image: ""
+            platform: linux
           - runner: ubuntu-24.04
             arch: i386
             docker_image: "i386/ubuntu:24.04"
+            platform: linux
           - runner: ubuntu-24.04-arm
             arch: armv7a
             docker_image: "arm32v7/ubuntu:24.04"
+            platform: linux
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout code
@@ -101,27 +105,79 @@ jobs:
         env:
           VERSION: ${{ needs.determine-version.outputs.version }}
           ARCH: ${{ matrix.arch }}
+          PLATFORM: ${{ matrix.platform }}
         run: |
           mkdir -p dist
-          cp build/ori "dist/ori-linux-${ARCH}-v${VERSION}.bin"
+          cp build/ori "dist/ori-${PLATFORM}-${ARCH}-v${VERSION}.bin"
 
       - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
-          name: ori-linux-${{ matrix.arch }}
+          name: ori-${{ matrix.platform }}-${{ matrix.arch }}
           path: dist/*
           if-no-files-found: error
+
+  build-freebsd:
+    needs: determine-version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: freebsd
+            arch: x86_64
+            target: freebsd/amd64
+          - platform: freebsd
+            arch: aarch64
+            target: freebsd/arm64
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: amd64,arm64
+
+      - name: Build FreeBSD ${{ matrix.arch }}
+        uses: cross-platform-actions/action@v0.23.0
+        env:
+          ORI_VERSION: ${{ needs.determine-version.outputs.version }}
+        with:
+          platform: ${{ matrix.target }}
+          command: |
+            pkg install -y cmake gmake curl
+            chmod +x build.sh
+            ./build.sh --clean
+        shell: bash
+
+      - name: Prepare FreeBSD ${{ matrix.arch }} release asset
+        env:
+          VERSION: ${{ needs.determine-version.outputs.version }}
+          ARCH: ${{ matrix.arch }}
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          mkdir -p dist
+          cp build/ori "dist/ori-${PLATFORM}-${ARCH}-v${VERSION}.bin"
+
+      - name: Upload FreeBSD ${{ matrix.arch }} binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ori-${{ matrix.platform }}-${{ matrix.arch }}
+          path: dist/ori-${{ matrix.platform }}-${{ matrix.arch }}-v${{ needs.determine-version.outputs.version }}.bin
+          if-no-files-found: warn
 
   release:
     needs:
       - determine-version
-      - build
+      - build-linux
+      - build-freebsd
     runs-on: ubuntu-latest
     steps:
       - name: Download binaries
         uses: actions/download-artifact@v4
         with:
-          pattern: ori-linux-*
+          pattern: ori-*-*
           path: dist
           merge-multiple: true
 
