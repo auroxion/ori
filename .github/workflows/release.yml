@@ -65,11 +65,11 @@ jobs:
             platform: linux
           - runner: ubuntu-24.04
             arch: i386
-            docker_image: "i386/ubuntu:22.04"
+            docker_image: "i386/debian:bookworm"
             platform: linux
           - runner: ubuntu-24.04-arm
             arch: armv7a
-            docker_image: "arm32v7/ubuntu:22.04"
+            docker_image: "arm32v7/debian:bookworm"
             platform: linux
     runs-on: ${{ matrix.runner }}
     steps:
@@ -81,7 +81,7 @@ jobs:
         run: |
           docker pull ${{ matrix.docker_image }}
           docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace ${{ matrix.docker_image }} bash -c "
-            apt-get update && apt-get install -y build-essential cmake g++ libcurl4-openssl-dev
+            apt-get update && apt-get install -y build-essential cmake g++ libcurl4-openssl-dev pkg-config
             chmod +x build.sh
             ./build.sh --clean
           "
@@ -91,7 +91,7 @@ jobs:
         if: matrix.docker_image == ''
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake g++ libcurl4-openssl-dev
+          sudo apt-get install -y build-essential cmake g++ libcurl4-openssl-dev pkg-config
 
       - name: Build Ori
         if: matrix.docker_image == ''
@@ -132,19 +132,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: amd64,arm64
-
       - name: Build FreeBSD ${{ matrix.arch }}
-        uses: cross-platform-actions/action@v0.23.0
+        uses: vmactions/freebsd-vm@v1
         env:
           ORI_VERSION: ${{ needs.determine-version.outputs.version }}
         with:
-          operating_system: ${{ matrix.os }}
-          run: |
+          arch: ${{ matrix.arch }}
+          cache-after-prepare: true
+          prepare: |
             pkg install -y cmake gmake curl
+          run: |
             chmod +x build.sh
             ./build.sh --clean
 
