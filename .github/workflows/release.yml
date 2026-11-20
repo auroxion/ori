@@ -149,7 +149,6 @@ jobs:
             pkg install -y cmake gmake curl
             chmod +x build.sh
             ./build.sh --clean
-        shell: bash
 
       - name: Prepare FreeBSD ${{ matrix.arch }} release asset
         env:
