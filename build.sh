@@ -29,6 +29,15 @@ download_httplib() {
     fi
 }
 
+# Helper to run commands with sudo if available, otherwise directly
+run_with_privilege() {
+    if command -v sudo >/dev/null 2>&1; then
+        sudo "$@"
+    else
+        "$@"
+    fi
+}
+
 # Version resolution function:
 # 1. Environment variable ORI_VERSION or VERSION
 # 2. Text file .version in project root
@@ -70,6 +79,14 @@ if [ "$CLEAN_BUILD" = true ]; then
     echo "Cleaning build directory..."
     rm -rf build
 fi
+
+run_with_privilege() {
+    if command -v sudo >/dev/null 2>&1; then
+        sudo "$@"
+    else
+        "$@"
+    fi
+}
 
 detect_and_offer_install() {
     pm="$1"; shift
@@ -138,23 +155,23 @@ detect_and_offer_install() {
         if [ "$install_pkgs" = true ]; then
             case "$pm" in
                 apt)
-                    sudo apt-get update
-                    sudo apt-get install -y "${missing[@]}"
+                    run_with_privilege apt-get update
+                    run_with_privilege apt-get install -y "${missing[@]}"
                     ;;
                 dnf)
-                    sudo dnf install -y "${missing[@]}"
+                    run_with_privilege dnf install -y "${missing[@]}"
                     ;;
                 pacman)
-                    sudo pacman -Syu --noconfirm "${missing[@]}"
+                    run_with_privilege pacman -Syu --noconfirm "${missing[@]}"
                     ;;
                 pkg)
-                    sudo pkg install -y "${missing[@]}"
+                    run_with_privilege pkg install -y "${missing[@]}"
                     ;;
                 pkg_add)
-                    sudo pkg_add -I "${missing[@]}"
+                    run_with_privilege pkg_add -I "${missing[@]}"
                     ;;
                 pkgin)
-                    sudo pkgin -y install "${missing[@]}"
+                    run_with_privilege pkgin -y install "${missing[@]}"
                     ;;
             esac
         else
