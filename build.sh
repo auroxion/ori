@@ -148,7 +148,9 @@ mkdir -p build
 cd build
 
 echo "Configuring with CMake..."
-cmake .. -DORI_VERSION="${VERSION}"
+cmake .. \
+  -DORI_VERSION="${VERSION}" \
+  -DCMAKE_BUILD_TYPE=Release
 
 echo "Building Ori Assistant..."
 make -j"$(nproc)"
