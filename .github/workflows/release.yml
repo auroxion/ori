@@ -1,4 +1,4 @@
-name: Release Pre-release
+name: Release
 
 on:
   push:
@@ -15,8 +15,51 @@ permissions:
   contents: write
 
 jobs:
-  build-and-release:
+  determine-version:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+      raw_tag: ${{ steps.get_version.outputs.raw_tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Determine version
+        id: get_version
+        env:
+          TAG_INPUT: ${{ inputs.tag_name }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [ -n "$TAG_INPUT" ]; then
+            RAW_VER="$TAG_INPUT"
+          elif [[ "$REF_NAME" == v* ]]; then
+            RAW_VER="$REF_NAME"
+          elif [ -f .version ] && [ -n "$(tr -d ' \n\r\t' < .version)" ]; then
+            RAW_VER="$(tr -d ' \n\r\t' < .version)"
+          else
+            RAW_VER="0.0"
+          fi
+
+          CLEAN_VER="$(echo "$RAW_VER" | sed -E 's/^[vV]//' | sed -E 's/-pre.*//')"
+          if [ -z "$CLEAN_VER" ]; then
+            CLEAN_VER="0.0"
+          fi
+
+          echo "version=$CLEAN_VER" >> "$GITHUB_OUTPUT"
+          echo "raw_tag=$RAW_VER" >> "$GITHUB_OUTPUT"
+          echo "Resolved release version: $CLEAN_VER (tag: $RAW_VER)"
+
+  build:
+    needs: determine-version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x86_64
+          - runner: ubuntu-24.04-arm
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -26,49 +69,46 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential cmake g++ libcurl4-openssl-dev
 
-      - name: Determine Version
-        id: get_version
-        run: |
-          TAG_INPUT="${{ github.event.inputs.tag_name }}"
-          REF_NAME="${{ github.ref_name }}"
-
-          if [ -n "$TAG_INPUT" ]; then
-            RAW_VER="$TAG_INPUT"
-          elif [[ "$REF_NAME" == v* ]]; then
-            RAW_VER="$REF_NAME"
-          elif [ -f .version ] && [ -n "$(tr -d ' \n\r\t' < .version 2>/dev/null)" ]; then
-            RAW_VER=$(tr -d ' \n\r\t' < .version)
-          else
-            RAW_VER="0.0"
-          fi
-
-          CLEAN_VER=$(echo "$RAW_VER" | sed -E 's/^[vV]//' | sed -E 's/-pre.*//')
-          if [ -z "$CLEAN_VER" ]; then
-            CLEAN_VER="0.0"
-          fi
-
-          echo "VERSION=${CLEAN_VER}" >> $GITHUB_ENV
-          echo "RAW_TAG=${RAW_VER}" >> $GITHUB_ENV
-          echo "Resolved release version: ${CLEAN_VER} (tag: ${RAW_VER})"
-
       - name: Build Ori
+        env:
+          ORI_VERSION: ${{ needs.determine-version.outputs.version }}
         run: |
           chmod +x build.sh
-          ORI_VERSION="${VERSION}" ./build.sh
+          ./build.sh
 
-      - name: Prepare Release Asset
+      - name: Prepare release asset
+        env:
+          VERSION: ${{ needs.determine-version.outputs.version }}
+          ARCH: ${{ matrix.arch }}
         run: |
           mkdir -p dist
-          cp build/ori dist/ori-linux_x86-64-v${VERSION}.bin
-          cp build/ori dist/ori
+          cp build/ori "dist/ori-linux-${ARCH}-v${VERSION}.bin"
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ori-linux-${{ matrix.arch }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    needs:
+      - determine-version
+      - build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download binaries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ori-linux-*
+          path: dist
+          merge-multiple: true
 
       - name: Create GitHub Pre-Release
         uses: softprops/action-gh-release@v2
         with:
           prerelease: true
-          tag_name: ${{ env.RAW_TAG }}
-          name: "Ori Pre-release v${{ env.VERSION }}"
-          files: |
-            dist/ori-linux_x86-64-v*.bin
-            dist/ori
+          tag_name: ${{ needs.determine-version.outputs.raw_tag }}
+          name: "Ori Pre-release v${{ needs.determine-version.outputs.version }}"
+          files: dist/*
           draft: false
