@@ -119,7 +119,7 @@ I am here to be your reliable partner in the terminal. Let me know what you need
 )ORI_PROMPT";
 
 void showUsage() {
-    std::cout << "ORI Terminal Assistant v" << ORI_VERSION << " - Linux TUI AI Assistant\n";
+    std::cout << "ORI Terminal Assistant v" << ORI_VERSION << " - Cross-platform TUI AI Assistant\n";
     std::cout << "Usage: ori [options] [prompt]\n\n";
     std::cout << "Options:\n";
     std::cout << "  -h, --help              Show this help message\n";
@@ -152,7 +152,37 @@ void showInfo(OriAssistant& assistant) {
     std::cout << "ORI Terminal Assistant System Diagnostics & Info\n";
     std::cout << "----------------------------------------------\n";
     std::cout << "Version:         " << ORI_VERSION << "\n";
-    std::cout << "Build Target:    Linux x86_64\n";
+    
+    // Determine platform at runtime
+#if defined(ORI_PLATFORM_LINUX)
+    std::cout << "Build Target:    Linux ";
+#elif defined(ORI_PLATFORM_FREEBSD)
+    std::cout << "Build Target:    FreeBSD ";
+#elif defined(ORI_PLATFORM_OPENBSD)
+    std::cout << "Build Target:    OpenBSD ";
+#elif defined(ORI_PLATFORM_NETBSD)
+    std::cout << "Build Target:    NetBSD ";
+#elif defined(ORI_PLATFORM_DRAGONFLYBSD)
+    std::cout << "Build Target:    DragonFlyBSD ";
+#else
+    std::cout << "Build Target:    Unknown ";
+#endif
+    
+    // Determine architecture at runtime
+#if defined(__x86_64__) || defined(_M_X64)
+    std::cout << "x86_64\n";
+#elif defined(__i386__) || defined(_M_IX86)
+    std::cout << "i386\n";
+#elif defined(__aarch64__) || defined(_M_ARM64)
+    std::cout << "aarch64\n";
+#elif defined(__arm__) || defined(_M_ARM)
+    std::cout << "armv7\n";
+#elif defined(__riscv64)
+    std::cout << "riscv64\n";
+#else
+    std::cout << "unknown\n";
+#endif
+    
 #if defined(__GNUG__)
     std::cout << "Compiler:        GCC " << __GNUC__ << "." << __GNUC_MINOR__ << "." << __GNUC_PATCHLEVEL__ << "\n";
 #elif defined(__clang__)

@@ -5,6 +5,30 @@
 
 set -e
 
+# httplib version to download
+HTTPLIB_VERSION="v0.15.3"
+HTTPLIB_URL="https://raw.githubusercontent.com/yhirose/cpp-httplib/${HTTPLIB_VERSION}/httplib.h"
+
+# Download httplib.h if not present
+download_httplib() {
+    local httplib_path="include/external/httplib.h"
+    if [ ! -f "$httplib_path" ]; then
+        echo "Downloading httplib.h (${HTTPLIB_VERSION})..."
+        mkdir -p include/external
+        if command -v curl >/dev/null 2>&1; then
+            curl -fsSL "$HTTPLIB_URL" -o "$httplib_path"
+        elif command -v wget >/dev/null 2>&1; then
+            wget -q "$HTTPLIB_URL" -O "$httplib_path"
+        else
+            echo "Error: curl or wget required to download httplib.h"
+            exit 1
+        fi
+        echo "httplib.h downloaded successfully"
+    else
+        echo "httplib.h already present, skipping download"
+    fi
+}
+
 # Version resolution function:
 # 1. Environment variable ORI_VERSION or VERSION
 # 2. Text file .version in project root
@@ -74,6 +98,27 @@ detect_and_offer_install() {
                 fi
             done
             ;;
+        pkg)
+            for pkg in "${pkgs[@]}"; do
+                if ! pkg info "$pkg" &> /dev/null; then
+                    missing+=("$pkg")
+                fi
+            done
+            ;;
+        pkg_add)
+            for pkg in "${pkgs[@]}"; do
+                if ! pkg_info -E "$pkg" &> /dev/null; then
+                    missing+=("$pkg")
+                fi
+            done
+            ;;
+        pkgin)
+            for pkg in "${pkgs[@]}"; do
+                if ! pkgin search "^${pkg}-" &> /dev/null; then
+                    missing+=("$pkg")
+                fi
+            done
+            ;;
     esac
 
     if [ ${#missing[@]} -gt 0 ]; then
@@ -102,6 +147,15 @@ detect_and_offer_install() {
                 pacman)
                     sudo pacman -Syu --noconfirm "${missing[@]}"
                     ;;
+                pkg)
+                    sudo pkg install -y "${missing[@]}"
+                    ;;
+                pkg_add)
+                    sudo pkg_add -I "${missing[@]}"
+                    ;;
+                pkgin)
+                    sudo pkgin -y install "${missing[@]}"
+                    ;;
             esac
         else
             echo "Please install the missing packages manually to proceed."
@@ -119,6 +173,12 @@ elif command -v dnf >/dev/null 2>&1; then
     PM="dnf"
 elif command -v pacman >/dev/null 2>&1; then
     PM="pacman"
+elif command -v pkg >/dev/null 2>&1; then
+    PM="pkg"
+elif command -v pkg_add >/dev/null 2>&1; then
+    PM="pkg_add"
+elif command -v pkgin >/dev/null 2>&1; then
+    PM="pkgin"
 fi
 
 echo "Package manager detected: $PM"
@@ -126,21 +186,39 @@ echo "Package manager detected: $PM"
 # Define required packages per distro
 case "$PM" in
     apt)
-        REQUIRED_PACKAGES=(libcurl4-openssl-dev build-essential cmake)
+        REQUIRED_PACKAGES=(libcurl4-openssl-dev build-essential cmake curl)
         detect_and_offer_install apt "${REQUIRED_PACKAGES[@]}"
         ;;
     dnf)
-        REQUIRED_PACKAGES=(libcurl-devel "@development-tools" cmake)
+        REQUIRED_PACKAGES=(libcurl-devel "@development-tools" cmake curl)
         detect_and_offer_install dnf "${REQUIRED_PACKAGES[@]}"
         ;;
     pacman)
         REQUIRED_PACKAGES=(curl base-devel cmake)
         detect_and_offer_install pacman "${REQUIRED_PACKAGES[@]}"
         ;;
+    pkg)
+        # FreeBSD
+        REQUIRED_PACKAGES=(curl cmake gmake)
+        detect_and_offer_install pkg "${REQUIRED_PACKAGES[@]}"
+        ;;
+    pkg_add)
+        # OpenBSD
+        REQUIRED_PACKAGES=(curl cmake gmake)
+        detect_and_offer_install pkg_add "${REQUIRED_PACKAGES[@]}"
+        ;;
+    pkgin)
+        # NetBSD
+        REQUIRED_PACKAGES=(curl cmake gmake)
+        detect_and_offer_install pkgin "${REQUIRED_PACKAGES[@]}"
+        ;;
     *)
-        echo "No supported package manager detected (apt, dnf, pacman). Skipping automatic dependency checks."
+        echo "No supported package manager detected (apt, dnf, pacman, pkg, pkg_add, pkgin). Skipping automatic dependency checks."
         ;;
 esac
+
+# Download httplib.h
+download_httplib
 
 echo "Building Ori Assistant v${VERSION}..."
 

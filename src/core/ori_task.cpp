@@ -27,8 +27,8 @@ TaskDispatcher::TaskDispatcher() {
         "You are an expert code reviewer. Analyze code for bugs, edge cases, and performance improvements."
     ));
     registerSubAgent(std::make_shared<SubAgent>(
-        "executor", "Command Executor", "Specializes in shell execution and Linux system administration",
-        "You are an expert Linux sysadmin. Determine the exact terminal commands required."
+        "executor", "Command Executor", "Specializes in shell execution and system administration",
+        "You are an expert sysadmin. Determine the exact terminal commands required."
     ));
     registerSubAgent(std::make_shared<SubAgent>(
         "planner", "Task Planner", "Breaks down goals into structured subtasks",

@@ -57,24 +57,45 @@ jobs:
         include:
           - runner: ubuntu-24.04
             arch: x86_64
+            docker_image: ""
           - runner: ubuntu-24.04-arm
             arch: aarch64
+            docker_image: ""
+          - runner: ubuntu-24.04
+            arch: i386
+            docker_image: "i386/ubuntu:24.04"
+          - runner: ubuntu-24.04-arm
+            arch: armv7a
+            docker_image: "arm32v7/ubuntu:24.04"
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set up Docker for cross-compilation
+        if: matrix.docker_image != ''
+        run: |
+          docker pull ${{ matrix.docker_image }}
+          docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace ${{ matrix.docker_image }} bash -c "
+            apt-get update && apt-get install -y build-essential cmake g++ libcurl4-openssl-dev
+            chmod +x build.sh
+            ./build.sh --clean
+          "
+        shell: bash
+
       - name: Install dependencies
+        if: matrix.docker_image == ''
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential cmake g++ libcurl4-openssl-dev
 
       - name: Build Ori
+        if: matrix.docker_image == ''
         env:
           ORI_VERSION: ${{ needs.determine-version.outputs.version }}
         run: |
           chmod +x build.sh
-          ./build.sh
+          ./build.sh --clean
 
       - name: Prepare release asset
         env:

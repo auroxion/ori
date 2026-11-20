@@ -1227,7 +1227,7 @@ void OriAssistant::run() {
                 std::cout << "  [+] generalist - General reasoning and problem solving" << std::endl;
                 std::cout << "  [+] coder      - Software engineering and code refactoring" << std::endl;
                 std::cout << "  [+] reviewer   - Code review and bug inspection" << std::endl;
-                std::cout << "  [+] executor   - Linux terminal and command execution" << std::endl;
+                std::cout << "  [+] executor   - Terminal and command execution" << std::endl;
                 std::cout << "  [+] planner    - Task planning and goal decomposition" << std::endl;
                 std::cout << BOLD << "----------------------------" << RESET << std::endl;
             } else if (input == "/undo") {
@@ -1841,7 +1841,36 @@ void OriAssistant::checkForUpdates(bool silent) {
                     std::string confirmation;
                     std::getline(std::cin, confirmation);
                     if (confirmation == "y" || confirmation == "Y") {
-                        std::string download_url = "https://github.com/piratheon/ORI/releases/download/v" + remote_version + "/ori-linux_x86-64-v" + remote_version + ".bin";
+                        // Determine platform and architecture for download URL
+                        std::string platform;
+                        std::string arch;
+#if defined(ORI_PLATFORM_LINUX)
+                        platform = "linux";
+#elif defined(ORI_PLATFORM_FREEBSD)
+                        platform = "freebsd";
+#elif defined(ORI_PLATFORM_OPENBSD)
+                        platform = "openbsd";
+#elif defined(ORI_PLATFORM_NETBSD)
+                        platform = "netbsd";
+#elif defined(ORI_PLATFORM_DRAGONFLYBSD)
+                        platform = "dragonflybsd";
+#else
+                        platform = "linux";
+#endif
+#if defined(__x86_64__) || defined(_M_X64)
+                        arch = "x86_64";
+#elif defined(__i386__) || defined(_M_IX86)
+                        arch = "i386";
+#elif defined(__aarch64__) || defined(_M_ARM64)
+                        arch = "aarch64";
+#elif defined(__arm__) || defined(_M_ARM)
+                        arch = "armv7";
+#elif defined(__riscv64)
+                        arch = "riscv64";
+#else
+                        arch = "x86_64";
+#endif
+                        std::string download_url = "https://github.com/piratheon/ORI/releases/download/v" + remote_version + "/ori-" + platform + "_" + arch + "-v" + remote_version + ".bin";
                         std::string temp_file = "/tmp/ori_update.bin";
                         CURL* download_curl = curl_easy_init();
                         if (download_curl) {

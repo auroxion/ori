@@ -1,0 +1,180 @@
+name: BSD Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name for pre-release (e.g. v1.1.6-pre)'
+        required: true
+        default: 'v1.1.6-pre'
+
+permissions:
+  contents: write
+
+jobs:
+  determine-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+      raw_tag: ${{ steps.get_version.outputs.raw_tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Determine version
+        id: get_version
+        env:
+          TAG_INPUT: ${{ inputs.tag_name }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [ -n "$TAG_INPUT" ]; then
+            RAW_VER="$TAG_INPUT"
+          elif [[ "$REF_NAME" == v* ]]; then
+            RAW_VER="$REF_NAME"
+          elif [ -f .version ] && [ -n "$(tr -d ' \n\r\t' < .version)" ]; then
+            RAW_VER="$(tr -d ' \n\r\t' < .version)"
+          else
+            RAW_VER="0.0"
+          fi
+
+          CLEAN_VER="$(echo "$RAW_VER" | sed -E 's/^[vV]//' | sed -E 's/-pre.*//')"
+          if [ -z "$CLEAN_VER" ]; then
+            CLEAN_VER="0.0"
+          fi
+
+          echo "version=$CLEAN_VER" >> "$GITHUB_OUTPUT"
+          echo "raw_tag=$RAW_VER" >> "$GITHUB_OUTPUT"
+          echo "Resolved release version: $CLEAN_VER (tag: $RAW_VER)"
+
+  build-freebsd:
+    needs: determine-version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU for FreeBSD cross-compilation
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: amd64,arm64
+
+      - name: Build FreeBSD x86_64
+        uses: cross-platform-actions/action@v0.23.0
+        env:
+          ORI_VERSION: ${{ needs.determine-version.outputs.version }}
+        with:
+          platform: freebsd/amd64
+          command: |
+            pkg install -y cmake gmake curl
+            chmod +x build.sh
+            ./build.sh --clean
+        shell: bash
+
+      - name: Prepare FreeBSD x86_64 release asset
+        env:
+          VERSION: ${{ needs.determine-version.outputs.version }}
+        run: |
+          mkdir -p dist
+          cp build/ori "dist/ori-freebsd-x86_64-v${VERSION}.bin"
+
+      - name: Upload FreeBSD x86_64 binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ori-freebsd-x86_64
+          path: dist/ori-freebsd-x86_64-v${{ needs.determine-version.outputs.version }}.bin
+          if-no-files-found: warn
+
+      - name: Build FreeBSD aarch64
+        uses: cross-platform-actions/action@v0.23.0
+        env:
+          ORI_VERSION: ${{ needs.determine-version.outputs.version }}
+        with:
+          platform: freebsd/arm64
+          command: |
+            pkg install -y cmake gmake curl
+            chmod +x build.sh
+            ./build.sh --clean
+        shell: bash
+
+      - name: Prepare FreeBSD aarch64 release asset
+        env:
+          VERSION: ${{ needs.determine-version.outputs.version }}
+        run: |
+          mkdir -p dist
+          cp build/ori "dist/ori-freebsd-aarch64-v${VERSION}.bin"
+
+      - name: Upload FreeBSD aarch64 binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ori-freebsd-aarch64
+          path: dist/ori-freebsd-aarch64-v${{ needs.determine-version.outputs.version }}.bin
+          if-no-files-found: warn
+
+  build-openbsd:
+    needs: determine-version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build OpenBSD x86_64 (requires self-hosted runner or cross-compilation)
+        run: |
+          echo "OpenBSD builds require a native OpenBSD runner."
+          echo "This is a placeholder for future self-hosted runner integration."
+          echo "To enable OpenBSD builds, add a self-hosted OpenBSD runner to this repository."
+        shell: bash
+
+      - name: Upload OpenBSD x86_64 binary (placeholder)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ori-openbsd-x86_64
+          path: dist/ori-openbsd-x86_64-v${{ needs.determine-version.outputs.version }}.bin
+          if-no-files-found: ignore
+
+  build-netbsd:
+    needs: determine-version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build NetBSD x86_64 (requires self-hosted runner or cross-compilation)
+        run: |
+          echo "NetBSD builds require a native NetBSD runner."
+          echo "This is a placeholder for future self-hosted runner integration."
+          echo "To enable NetBSD builds, add a self-hosted NetBSD runner to this repository."
+        shell: bash
+
+      - name: Upload NetBSD x86_64 binary (placeholder)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ori-netbsd-x86_64
+          path: dist/ori-netbsd-x86_64-v${{ needs.determine-version.outputs.version }}.bin
+          if-no-files-found: ignore
+
+  release:
+    needs:
+      - determine-version
+      - build-freebsd
+      - build-openbsd
+      - build-netbsd
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download binaries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ori-*-*
+          path: dist
+          merge-multiple: true
+
+      - name: Create GitHub Pre-Release
+        uses: softprops/action-gh-release@v2
+        with:
+          prerelease: true
+          tag_name: ${{ needs.determine-version.outputs.raw_tag }}
+          name: "Ori BSD Pre-release v${{ needs.determine-version.outputs.version }}"
+          files: dist/*
+          draft: false
