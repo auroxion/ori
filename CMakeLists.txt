@@ -112,10 +112,44 @@ install(FILES LICENSE DESTINATION share/Ori)
 install(DIRECTORY include/ DESTINATION include/ori OPTIONAL)
 install(DIRECTORY www/ DESTINATION share/Ori/www OPTIONAL)
 
+# Determine objcopy output target and binary architecture for cross-platform / ARM support
+set(TARGET_ARCH "${CMAKE_SYSTEM_PROCESSOR}")
+if(DEFINED CMAKE_CXX_COMPILER_TARGET AND NOT "${CMAKE_CXX_COMPILER_TARGET}" STREQUAL "")
+    set(TARGET_ARCH "${CMAKE_CXX_COMPILER_TARGET}")
+endif()
+
+# Default to x86_64
+set(OBJCOPY_OUTPUT_TARGET "elf64-x86-64")
+set(OBJCOPY_BINARY_ARCH "i386:x86-64")
+
+if(TARGET_ARCH MATCHES "aarch64|arm64|ARM64")
+    set(OBJCOPY_OUTPUT_TARGET "elf64-littleaarch64")
+    set(OBJCOPY_BINARY_ARCH "aarch64")
+elseif(TARGET_ARCH MATCHES "armv7|armv6|armhf|arm|ARM")
+    set(OBJCOPY_OUTPUT_TARGET "elf32-littlearm")
+    set(OBJCOPY_BINARY_ARCH "arm")
+elseif(TARGET_ARCH MATCHES "riscv64")
+    set(OBJCOPY_OUTPUT_TARGET "elf64-littleriscv")
+    set(OBJCOPY_BINARY_ARCH "riscv:rv64")
+elseif(TARGET_ARCH MATCHES "i386|i686|x86")
+    set(OBJCOPY_OUTPUT_TARGET "elf32-i386")
+    set(OBJCOPY_BINARY_ARCH "i386")
+elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
+    set(OBJCOPY_OUTPUT_TARGET "elf32-i386")
+    set(OBJCOPY_BINARY_ARCH "i386")
+endif()
+
+find_program(CMAKE_OBJCOPY objcopy NAMES ${CMAKE_CXX_COMPILER_TARGET}-objcopy objcopy)
+if(NOT CMAKE_OBJCOPY)
+    set(CMAKE_OBJCOPY objcopy)
+endif()
+
+message(STATUS "Embedding resources using objcopy (${CMAKE_OBJCOPY}): target=${OBJCOPY_OUTPUT_TARGET}, arch=${OBJCOPY_BINARY_ARCH}")
+
 # Embed index.html into the executable
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/index.html.o
-    COMMAND objcopy --input-target binary --output-target elf64-x86-64 --binary-architecture i386:x86-64 index.html ${CMAKE_CURRENT_BINARY_DIR}/index.html.o
+    COMMAND ${CMAKE_OBJCOPY} --input-target binary --output-target ${OBJCOPY_OUTPUT_TARGET} --binary-architecture ${OBJCOPY_BINARY_ARCH} index.html ${CMAKE_CURRENT_BINARY_DIR}/index.html.o
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/www
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/www/index.html
 )
@@ -124,7 +158,7 @@ target_sources(ori PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/index.html.o)
 # Embed favicon.svg into the executable
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/favicon.svg.o
-    COMMAND objcopy --input-target binary --output-target elf64-x86-64 --binary-architecture i386:x86-64 favicon.svg ${CMAKE_CURRENT_BINARY_DIR}/favicon.svg.o
+    COMMAND ${CMAKE_OBJCOPY} --input-target binary --output-target ${OBJCOPY_OUTPUT_TARGET} --binary-architecture ${OBJCOPY_BINARY_ARCH} favicon.svg ${CMAKE_CURRENT_BINARY_DIR}/favicon.svg.o
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/www
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/www/favicon.svg
 )
@@ -133,7 +167,7 @@ target_sources(ori PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/favicon.svg.o)
 # Embed tw.js into the executable
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/tw.js.o
-    COMMAND objcopy --input-target binary --output-target elf64-x86-64 --binary-architecture i386:x86-64 tw.js ${CMAKE_CURRENT_BINARY_DIR}/tw.js.o
+    COMMAND ${CMAKE_OBJCOPY} --input-target binary --output-target ${OBJCOPY_OUTPUT_TARGET} --binary-architecture ${OBJCOPY_BINARY_ARCH} tw.js ${CMAKE_CURRENT_BINARY_DIR}/tw.js.o
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/www
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/www/tw.js
 )
@@ -142,7 +176,7 @@ target_sources(ori PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/tw.js.o)
 # Embed chart.js into the executable
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/chart.js.o
-    COMMAND objcopy --input-target binary --output-target elf64-x86-64 --binary-architecture i386:x86-64 chart.js ${CMAKE_CURRENT_BINARY_DIR}/chart.js.o
+    COMMAND ${CMAKE_OBJCOPY} --input-target binary --output-target ${OBJCOPY_OUTPUT_TARGET} --binary-architecture ${OBJCOPY_BINARY_ARCH} chart.js ${CMAKE_CURRENT_BINARY_DIR}/chart.js.o
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/www/lib
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/www/lib/chart.js
 )
@@ -151,7 +185,7 @@ target_sources(ori PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/chart.js.o)
 # Embed css2.css into the executable
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/css2.css.o
-    COMMAND objcopy --input-target binary --output-target elf64-x86-64 --binary-architecture i386:x86-64 css2.css ${CMAKE_CURRENT_BINARY_DIR}/css2.css.o
+    COMMAND ${CMAKE_OBJCOPY} --input-target binary --output-target ${OBJCOPY_OUTPUT_TARGET} --binary-architecture ${OBJCOPY_BINARY_ARCH} css2.css ${CMAKE_CURRENT_BINARY_DIR}/css2.css.o
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/www
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/www/css2.css
 )
@@ -160,7 +194,7 @@ target_sources(ori PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/css2.css.o)
 # Embed marked.min.js into the executable
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/marked.min.js.o
-    COMMAND objcopy --input-target binary --output-target elf64-x86-64 --binary-architecture i386:x86-64 marked.min.js ${CMAKE_CURRENT_BINARY_DIR}/marked.min.js.o
+    COMMAND ${CMAKE_OBJCOPY} --input-target binary --output-target ${OBJCOPY_OUTPUT_TARGET} --binary-architecture ${OBJCOPY_BINARY_ARCH} marked.min.js ${CMAKE_CURRENT_BINARY_DIR}/marked.min.js.o
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/www/lib
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/www/lib/marked.min.js
 )
@@ -169,7 +203,7 @@ target_sources(ori PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/marked.min.js.o)
 # Embed all.min.css into the executable
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/all.min.css.o
-    COMMAND objcopy --input-target binary --output-target elf64-x86-64 --binary-architecture i386:x86-64 all.min.css ${CMAKE_CURRENT_BINARY_DIR}/all.min.css.o
+    COMMAND ${CMAKE_OBJCOPY} --input-target binary --output-target ${OBJCOPY_OUTPUT_TARGET} --binary-architecture ${OBJCOPY_BINARY_ARCH} all.min.css ${CMAKE_CURRENT_BINARY_DIR}/all.min.css.o
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/www/css
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/www/css/all.min.css
 )
