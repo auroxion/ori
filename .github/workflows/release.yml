@@ -145,7 +145,7 @@ jobs:
       - name: Build FreeBSD ${{ matrix.arch }}
         shell: freebsd {0}
         run: |
-          cd /home/runner/work/ori/ori
+          ls -la
           chmod +x build.sh
           ./build.sh --clean
 
