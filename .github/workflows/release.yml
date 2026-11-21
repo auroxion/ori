@@ -67,7 +67,7 @@ jobs:
             arch: i386
             docker_image: "i386/debian:bookworm"
             platform: linux
-          - runner: ubuntu-24.04-arm
+          - runner: ubuntu-24.04
             arch: armv7a
             docker_image: "arm32v7/debian:bookworm"
             platform: linux
@@ -139,9 +139,11 @@ jobs:
         with:
           arch: ${{ matrix.arch }}
           cache-after-prepare: true
+          sync: rsync
           prepare: |
             pkg install -y cmake gmake curl
           run: |
+            cd /home/runner/work/ori/ori
             chmod +x build.sh
             ./build.sh --clean
 
